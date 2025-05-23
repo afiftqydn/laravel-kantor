@@ -12,14 +12,15 @@ class Pengajuan extends Model implements HasMedia
     use InteractsWithMedia;
 
     protected $fillable = [
-        'judul',
-        'deskripsi',
-        'status',
-        'catatan',
         'user_id',
         'unit_id',
         'sub_unit_id',
         'cabang_id',
+        'judul',
+        'deskripsi',
+        'status',
+        'catatan',
+
         // Jangan masukkan 'lampiran' karena media library pakai tabel media terpisah
     ];
 

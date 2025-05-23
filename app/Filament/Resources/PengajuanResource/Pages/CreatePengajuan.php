@@ -9,17 +9,14 @@ class CreatePengajuan extends CreateRecord
 {
     protected static string $resource = PengajuanResource::class;
 
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Hapus data lampiran_files dari data utama agar tidak disimpan ke kolom database
         unset($data['lampiran_files']);
         return $data;
     }
 
-    protected function afterSave(): void
+    protected function afterCreate(): void
     {
-        parent::afterSave();
-
         $files = $this->form->getState()['lampiran_files'] ?? [];
 
         foreach ($files as $file) {

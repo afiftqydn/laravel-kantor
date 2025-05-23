@@ -15,6 +15,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Illuminate\Support\Facades\Auth;
 
 class PengajuanResource extends Resource
 {
@@ -31,18 +32,15 @@ class PengajuanResource extends Resource
                 Hidden::make('sub_unit_id')->default(auth()->user()?->sub_unit_id),
                 Hidden::make('cabang_id')->default(auth()->user()?->cabang_id),
 
-                TextInput::make('judul')
-                    ->label('Judul Pengajuan')
+                Forms\Components\TextInput::make('judul')
                     ->required()
                     ->maxLength(255),
 
-                Textarea::make('deskripsi')
-                    ->label('Deskripsi')
-                    ->nullable()
-                    ->maxLength(5000),
+                Forms\Components\Textarea::make('deskripsi')
+                    ->rows(3)
+                    ->nullable(),
 
-                Select::make('status')
-                    ->label('Status')
+                Forms\Components\Select::make('status')
                     ->options([
                         'draft' => 'Draft',
                         'diproses' => 'Diproses',
@@ -50,12 +48,11 @@ class PengajuanResource extends Resource
                         'ditolak' => 'Ditolak',
                     ])
                     ->default('draft')
-                    ->disabled(), // agar hanya bisa diubah oleh analis
+                    ->required(),
 
-                Textarea::make('catatan')
-                    ->label('Catatan Analis')
-                    ->nullable()
-                    ->disabled(),
+                Forms\Components\Textarea::make('catatan')
+                    ->rows(3)
+                    ->nullable(),
 
                 FileUpload::make('lampiran_files')
                     ->label('Lampiran Berkas')
@@ -65,6 +62,7 @@ class PengajuanResource extends Resource
                     ->enableDownload()
                     ->preserveFilenames()
                     ->nullable(),
+
             ]);
     }
 
@@ -73,10 +71,22 @@ class PengajuanResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('judul')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('status')->badge()->sortable(),
-                Tables\Columns\TextColumn::make('created_at')->label('Dibuat')->dateTime(),
+                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('user.name')->label('Dibuat Oleh')->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Dibuat Pada')
+                    ->dateTime('d-m-Y H:i')
+                    ->sortable(),
             ])
-            ->filters([])
+            ->filters([
+                Tables\Filters\SelectFilter::make('status')
+                    ->options([
+                        'draft' => 'Draft',
+                        'diproses' => 'Diproses',
+                        'disetujui' => 'Disetujui',
+                        'ditolak' => 'Ditolak',
+                    ]),
+            ])
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
@@ -97,5 +107,33 @@ class PengajuanResource extends Resource
             'create' => Pages\CreatePengajuan::route('/create'),
             'edit' => Pages\EditPengajuan::route('/{record}/edit'),
         ];
+    }
+    public static function getEloquentQuery(): Builder
+    {
+        $user = Auth::user();
+
+        // Super user: akses penuh
+        if ($user->hasRole('super_user')) {
+            return parent::getEloquentQuery();
+        }
+
+        // Admin Sub Unit: hanya data milik sub_unit
+        if ($user->hasRole('admin_sub_unit')) {
+            return parent::getEloquentQuery()
+                ->where('sub_unit_id', $user->sub_unit_id);
+        }
+
+        if ($user->hasAnyRole(['admin_unit', 'analis_unit', 'kepala_unit'])) {
+            return parent::getEloquentQuery()
+                ->where('unit_id', $user->unit_id)
+                ->where('cabang_id', $user->cabang_id);
+        }        // Admin/Analis/Kepala Cabang: semua data dalam cabang
+        if ($user->hasAnyRole(['admin_cabang', 'analis_cabang', 'kepala_cabang'])) {
+            return parent::getEloquentQuery()
+                ->where('cabang_id', $user->cabang_id);
+        }
+
+        // Role tidak dikenal: kosongkan query
+        return parent::getEloquentQuery()->whereRaw('0 = 1');
     }
 }

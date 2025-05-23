@@ -17,8 +17,6 @@ class EditPengajuan extends EditRecord
 
     protected function afterSave(): void
     {
-        parent::afterSave();
-
         $files = $this->form->getState()['lampiran_files'] ?? [];
 
         foreach ($files as $file) {
